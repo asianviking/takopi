@@ -363,16 +363,7 @@ def run(
     setup_logging(log_file if log_file else None)
     config = load_telegram_config()
     token = config["bot_token"]
-
-    def _as_int_set(value: Any) -> set[int]:
-        if isinstance(value, int):
-            return {value}
-        if isinstance(value, list):
-            return {int(v) for v in value}
-        raise TypeError(f"expected int or list[int], got {type(value).__name__}")
-
-    allowed = _as_int_set(config.get("allowed_chat_ids", config["chat_id"]))
-    startup_ids = _as_int_set(config.get("startup_chat_ids", config["chat_id"]))
+    config_chat_id = int(config["chat_id"])
 
     startup_msg = config.get("startup_message", "✅ exec_bridge started (codex exec).")
     startup_pwd = os.getcwd()
@@ -431,19 +422,11 @@ def run(
 
     logger.info("[startup] pwd=%s", startup_pwd)
     logger.info("Option1 bridge running (codex exec). Long-polling Telegram...")
-    if startup_ids:
-        for chat_id in startup_ids:
-            try:
-                bot.send_message(chat_id=chat_id, text=startup_msg)
-                logger.info("[startup] sent startup message to chat_id=%s", chat_id)
-            except Exception as e:
-                logger.info(
-                    "[startup] failed to send startup message to chat_id=%s: %s",
-                    chat_id,
-                    e,
-                )
-    else:
-        logger.info("[startup] no chat_id configured; skipping startup message")
+    try:
+        bot.send_message(chat_id=config_chat_id, text=startup_msg)
+        logger.info("[startup] sent startup message to chat_id=%s", config_chat_id)
+    except Exception as e:
+        logger.info("[startup] failed to send startup message to chat_id=%s: %s", config_chat_id, e)
 
     def handle(
         chat_id: int, user_msg_id: int, text: str, resume_session: str | None
@@ -634,11 +617,11 @@ def run(
                 )
                 continue
 
-            if allowed is not None and int(chat_id) not in allowed:
+            if int(chat_id) != config_chat_id:
                 logger.info(
                     "[telegram] rejected by ACL chat_id=%s allowed=%s",
                     chat_id,
-                    sorted(allowed),
+                    config_chat_id,
                 )
                 continue
 
