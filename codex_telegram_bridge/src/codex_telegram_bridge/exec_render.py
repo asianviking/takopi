@@ -13,7 +13,6 @@ HEADER_SEP = " · "
 HARD_BREAK = "  \n"
 
 MAX_CMD_LEN = 40
-MAX_REASON_LEN = 80
 MAX_QUERY_LEN = 60
 MAX_PATH_LEN = 40
 MAX_PROGRESS_CHARS = 300
@@ -52,12 +51,6 @@ def format_header(elapsed_s: float, turn: Optional[int], label: str) -> str:
     if turn is not None:
         return f"{label}{HEADER_SEP}{elapsed}{HEADER_SEP}turn {turn}"
     return f"{label}{HEADER_SEP}{elapsed}"
-
-
-def format_reasoning(text: str) -> str:
-    if not text:
-        return ""
-    return f"_{truncate(text, MAX_REASON_LEN)}_"
 
 
 def format_command(command: str) -> str:
@@ -151,10 +144,6 @@ def format_item_completed_line(item_id: Optional[int], item: dict[str, Any]) -> 
 @dataclass
 class ExecRenderState:
     recent_actions: deque[str] = field(default_factory=lambda: deque(maxlen=5))
-    current_action: Optional[str] = None
-    current_action_id: Optional[int] = None
-    pending_reasoning: Optional[str] = None
-    current_reasoning: Optional[str] = None
     last_turn: Optional[int] = None
 
 
@@ -162,37 +151,6 @@ def record_item(state: ExecRenderState, item: dict[str, Any]) -> None:
     numeric_id = extract_numeric_id(item["id"])
     if numeric_id is not None:
         state.last_turn = numeric_id
-
-
-def set_current_action(state: ExecRenderState, item_id: Optional[int], line: str) -> bool:
-    changed = False
-    if state.current_action != line or state.current_action_id != item_id:
-        state.current_action = line
-        state.current_action_id = item_id
-        if state.pending_reasoning:
-            state.current_reasoning = state.pending_reasoning
-            state.pending_reasoning = None
-        changed = True
-    return changed
-
-
-def complete_action(state: ExecRenderState, item_id: Optional[int], line: str) -> bool:
-    changed = False
-    if state.current_reasoning:
-        if not state.recent_actions or state.recent_actions[-1] != state.current_reasoning:
-            state.recent_actions.append(state.current_reasoning)
-            changed = True
-    if line:
-        state.recent_actions.append(line)
-        changed = True
-    if item_id and state.current_action_id == item_id:
-        state.current_action = None
-        state.current_action_id = None
-        state.current_reasoning = None
-        changed = True
-    if not item_id and state.current_action_id is None:
-        state.current_reasoning = None
-    return changed
 
 
 def render_event_cli(
@@ -249,7 +207,6 @@ class ExecProgressRenderer:
 
     def note_event(self, event: dict[str, Any]) -> bool:
         etype = event["type"]
-        changed = False
 
         if etype in {"thread.started", "turn.started"}:
             return True
@@ -260,43 +217,25 @@ class ExecProgressRenderer:
             itype = item["type"]
             item_id = extract_numeric_id(item["id"], self.state.last_turn)
 
-            if itype == "reasoning":
-                reasoning = format_reasoning(item["text"])
-                if reasoning:
-                    reasoning_line = with_id(item_id, reasoning)
-                    if self.state.current_action and not self.state.current_reasoning:
-                        self.state.current_reasoning = reasoning_line
-                        changed = True
-                    else:
-                        self.state.pending_reasoning = reasoning_line
-                return changed
+            if itype == "agent_message":
+                return False
 
             action_line = format_item_action_line(etype, item_id, item)
             if action_line is not None:
-                if etype == "item.started":
-                    return set_current_action(self.state, item_id, action_line) or changed
-                if etype == "item.completed":
-                    return complete_action(self.state, item_id, action_line) or changed
-                return changed
+                self.state.recent_actions.append(action_line)
+                return True
 
             if etype == "item.completed":
                 completed_line = format_item_completed_line(item_id, item)
                 if completed_line is not None:
-                    return complete_action(self.state, item_id, completed_line) or changed
+                    self.state.recent_actions.append(completed_line)
+                    return True
 
-        return changed
+        return False
 
     def render_progress(self, elapsed_s: float) -> str:
         header = format_header(elapsed_s, self.state.last_turn, label="working")
-        current_reasoning = self.state.current_reasoning
-        current_action = self.state.current_action
-        lines = list(self.state.recent_actions)
-        if current_reasoning and current_action:
-            lines.append(current_reasoning)
-        if current_action:
-            lines.append(current_action)
-
-        message = self._assemble(header, lines)
+        message = self._assemble(header, list(self.state.recent_actions))
         if len(message) <= self.max_chars:
             return message
         return header
