@@ -18,6 +18,7 @@ import typer
 
 from .config import config_get, load_telegram_config, resolve_chat_ids
 from .constants import TELEGRAM_HARD_LIMIT
+from .exec_render import ExecProgressRenderer, ExecRenderState, render_event_cli
 from .rendering import render_markdown
 from .routes import RouteStore
 from .telegram_client import TelegramClient
@@ -43,21 +44,6 @@ def _clamp_tg_text(text: str, limit: int = TELEGRAM_TEXT_LIMIT) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 20] + "\n...(truncated)"
-
-
-def _summarize_item(item: Dict[str, Any]) -> str:
-    item_type = item.get("type")
-    if isinstance(item_type, str):
-        if item_type == "agent_message" and isinstance(item.get("text"), str):
-            snippet = item["text"].strip().replace("\n", " ")
-            if len(snippet) > 140:
-                snippet = snippet[:140] + "..."
-            return f"agent_message: {snippet}"
-        name = item.get("name") or item.get("tool_name") or item.get("id")
-        if isinstance(name, str):
-            return f"{item_type}: {name}"
-        return item_type
-    return "item.completed"
 
 
 class ProgressEditor:
@@ -202,15 +188,18 @@ class CodexExecRunner:
         found_session: Optional[str] = session_id
         last_agent_text: Optional[str] = None
 
+        cli_state = ExecRenderState()
+
         for line in proc.stdout:
             line = line.strip()
             if not line:
                 continue
-            log(f"[codex][event] {line}")
             try:
                 evt = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            for out in render_event_cli(evt, cli_state):
+                log(f"[codex] {out}")
             if on_event is not None:
                 try:
                     on_event(evt)
@@ -387,6 +376,7 @@ def run(
 
         started_at = time.monotonic()
         session_box: dict[str, Optional[str]] = {"id": resume_session}
+        progress_renderer = ExecProgressRenderer(max_lines=4)
 
         def on_event(evt: Dict[str, Any]) -> None:
             event_type = evt.get("type")
@@ -402,17 +392,15 @@ def run(
                             thread_id,
                             meta={"workspace": workspace},
                         )
-            elif event_type == "item.completed":
-                item = evt.get("item") or {}
+            line = progress_renderer.note_event(evt)
+            if line and progress is not None:
                 elapsed = int(time.monotonic() - started_at)
-                line = _summarize_item(item) if isinstance(item, dict) else "item.completed"
                 session_id = session_box["id"]
                 header = f"Working... ({elapsed}s)"
                 if session_id:
                     header += f"\nSession: {session_id}"
-                msg = f"{header}\n\n{line}"
-                if progress is not None:
-                    progress.set(msg)
+                msg = progress_renderer.render(header)
+                progress.set(msg)
 
         def _stop_background() -> None:
             typing_stop.set()
@@ -459,12 +447,6 @@ def run(
         can_edit_final = progress_id is not None and len(final_text) <= TELEGRAM_TEXT_LIMIT
 
         if loud_final or not can_edit_final:
-            if progress_id is not None:
-                try:
-                    bot.delete_message(chat_id=chat_id, message_id=progress_id)
-                except Exception as e:
-                    log(f"[handle] delete progress failed chat_id={chat_id} message_id={progress_id}: {e}")
-
             sent_msgs = bot.send_message_markdown_chunked(
                 chat_id=chat_id,
                 text=answer,
@@ -472,6 +454,11 @@ def run(
             )
             for m in sent_msgs:
                 store.link(chat_id, m["message_id"], "exec", session_id, meta={"workspace": workspace})
+            if progress_id is not None:
+                try:
+                    bot.delete_message(chat_id=chat_id, message_id=progress_id)
+                except Exception as e:
+                    log(f"[handle] delete progress failed chat_id={chat_id} message_id={progress_id}: {e}")
         else:
             bot.edit_message_text(
                 chat_id=chat_id,
