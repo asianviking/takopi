@@ -9,7 +9,14 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, Optional, Tuple
 
-from bridge_common import TelegramClient, RouteStore, parse_allowed_chat_ids
+from bridge_common import (
+    TelegramClient,
+    RouteStore,
+    config_get,
+    load_telegram_config,
+    parse_allowed_chat_ids,
+    parse_chat_id_list,
+)
 
 # -------------------- Codex runner --------------------
 
@@ -138,17 +145,32 @@ class CodexExecRunner:
 
 
 def main() -> None:
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    db_path = os.environ.get("BRIDGE_DB", "./bridge_routes.sqlite3")
+    config = load_telegram_config()
+    token = os.environ.get("TELEGRAM_BOT_TOKEN") or config_get(config, "bot_token") or ""
+    db_path = os.environ.get("BRIDGE_DB") or config_get(config, "bridge_db") or "./bridge_routes.sqlite3"
     allowed = parse_allowed_chat_ids(os.environ.get("ALLOWED_CHAT_IDS", ""))
-    startup_ids = parse_allowed_chat_ids(os.environ.get("STARTUP_CHAT_IDS", "")) or allowed
-    startup_msg = os.environ.get("STARTUP_MESSAGE", "✅ exec_bridge started (codex exec).")
+    if allowed is None:
+        allowed = parse_chat_id_list(config_get(config, "allowed_chat_ids"))
+    startup_ids = parse_allowed_chat_ids(os.environ.get("STARTUP_CHAT_IDS", ""))
+    if startup_ids is None:
+        startup_ids = parse_chat_id_list(config_get(config, "startup_chat_ids"))
+    if startup_ids is None:
+        startup_ids = allowed
+    startup_msg = os.environ.get("STARTUP_MESSAGE") or config_get(
+        config, "startup_message"
+    ) or "✅ exec_bridge started (codex exec)."
     startup_pwd = os.getcwd()
     startup_msg = f"{startup_msg}\nPWD: {startup_pwd}"
 
-    codex_cmd = os.environ.get("CODEX_CMD", "codex")
-    workspace = os.environ.get("CODEX_WORKSPACE")  # optional
-    extra_args = shlex.split(os.environ.get("CODEX_EXEC_ARGS", ""))  # e.g. "--full-auto --search"
+    codex_cmd = os.environ.get("CODEX_CMD") or config_get(config, "codex_cmd") or "codex"
+    workspace = os.environ.get("CODEX_WORKSPACE") or config_get(config, "codex_workspace")
+    raw_exec_args = os.environ.get("CODEX_EXEC_ARGS")
+    if raw_exec_args is None:
+        raw_exec_args = config_get(config, "codex_exec_args") or ""
+    if isinstance(raw_exec_args, list):
+        extra_args = [str(v) for v in raw_exec_args]
+    else:
+        extra_args = shlex.split(str(raw_exec_args))  # e.g. "--full-auto --search"
 
     def _has_notify_override(args: list[str]) -> bool:
         for i, arg in enumerate(args):

@@ -12,7 +12,18 @@ All options store a mapping from `(chat_id, bot_message_id)` to a route so repli
 
 1. Ensure `uv` is installed.
 2. Use the scripts in this folder as-is (no extra dependencies).
-3. Set `TELEGRAM_BOT_TOKEN` and (optionally) `ALLOWED_CHAT_IDS`.
+3. Set `TELEGRAM_BOT_TOKEN` and (optionally) `ALLOWED_CHAT_IDS`, or put them in `~/.codex/telegram.toml`.
+
+Example `~/.codex/telegram.toml`:
+
+```toml
+bot_token = "123:abc"
+allowed_chat_ids = [123456789]
+startup_chat_ids = [123456789]
+startup_message = "✅ exec_bridge started (codex exec)."
+```
+
+Environment variables always override the TOML file.
 
 ## Option 1: exec/resume
 

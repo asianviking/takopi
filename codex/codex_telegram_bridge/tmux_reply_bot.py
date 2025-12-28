@@ -5,7 +5,14 @@ import subprocess
 import time
 from typing import Optional
 
-from bridge_common import TelegramClient, RouteStore, parse_allowed_chat_ids
+from bridge_common import (
+    TelegramClient,
+    RouteStore,
+    config_get,
+    load_telegram_config,
+    parse_allowed_chat_ids,
+    parse_chat_id_list,
+)
 
 
 def tmux_send_text(target: str, text: str, press_enter: bool = True) -> None:
@@ -21,9 +28,12 @@ def tmux_send_text(target: str, text: str, press_enter: bool = True) -> None:
 
 
 def main() -> None:
-    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-    db_path = os.environ.get("BRIDGE_DB", "./bridge_routes.sqlite3")
+    config = load_telegram_config()
+    token = os.environ.get("TELEGRAM_BOT_TOKEN") or config_get(config, "bot_token") or ""
+    db_path = os.environ.get("BRIDGE_DB") or config_get(config, "bridge_db") or "./bridge_routes.sqlite3"
     allowed = parse_allowed_chat_ids(os.environ.get("ALLOWED_CHAT_IDS", ""))
+    if allowed is None:
+        allowed = parse_chat_id_list(config_get(config, "allowed_chat_ids"))
 
     bot = TelegramClient(token)
     store = RouteStore(db_path)

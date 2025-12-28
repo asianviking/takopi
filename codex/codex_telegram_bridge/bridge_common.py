@@ -7,14 +7,46 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 TELEGRAM_HARD_LIMIT = 4096
 DEFAULT_CHUNK_LEN = 3500  # leave room for formatting / safety
+TELEGRAM_CONFIG_PATH = Path.home() / ".codex" / "telegram.toml"
 
 
 def _now_unix() -> int:
     return int(time.time())
+
+
+def _load_toml(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {}
+    try:
+        import tomllib  # type: ignore[attr-defined]
+    except ModuleNotFoundError:
+        try:
+            import tomli as tomllib  # type: ignore[import-not-found]
+        except ModuleNotFoundError as e:
+            raise RuntimeError(
+                f"TOML config found at {path} but tomllib/tomli is unavailable. "
+                "Use Python 3.11+ or install tomli."
+            ) from e
+    return tomllib.loads(path.read_text(encoding="utf-8"))
+
+
+def load_telegram_config(path: Optional[str] = None) -> Dict[str, Any]:
+    cfg_path = Path(path) if path else TELEGRAM_CONFIG_PATH
+    return _load_toml(cfg_path)
+
+
+def config_get(config: Dict[str, Any], key: str) -> Any:
+    if key in config:
+        return config[key]
+    nested = config.get("telegram")
+    if isinstance(nested, dict) and key in nested:
+        return nested[key]
+    return None
 
 
 def chunk_text(text: str, limit: int = DEFAULT_CHUNK_LEN) -> List[str]:
@@ -237,3 +269,25 @@ def parse_allowed_chat_ids(env_value: str) -> Optional[set[int]]:
             continue
         out.add(int(part))
     return out
+
+
+def parse_chat_id_list(value: Any) -> Optional[set[int]]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return parse_allowed_chat_ids(value)
+    if isinstance(value, int):
+        return {value}
+    if isinstance(value, (list, tuple, set)):
+        out: set[int] = set()
+        for item in value:
+            if item is None:
+                continue
+            if isinstance(item, str):
+                if not item.strip():
+                    continue
+                out.add(int(item))
+            else:
+                out.add(int(item))
+        return out or None
+    return None
