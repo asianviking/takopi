@@ -21,10 +21,6 @@ chat_id = 123456789
 
 `chat_id` is used both for allowed messages and startup notifications.
 
-Optional keys:
-
-- exec/resume: `cd`, `codex_exec_args`
-
 ## Option 1: exec/resume
 
 Run:

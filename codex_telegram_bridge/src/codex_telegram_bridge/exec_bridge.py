@@ -323,14 +323,20 @@ def _parse_bridge_config(
     token = config["bot_token"]
     chat_id = int(config["chat_id"])
 
-    startup_pwd = os.getcwd()
-    startup_msg = f"codex exec bridge has started\npwd: {startup_pwd}"
-
     codex_cmd = shutil.which("codex")
     if not codex_cmd:
         raise RuntimeError("codex not found on PATH")
 
-    workspace = cd if cd is not None else config.get("cd")
+    startup_pwd = os.getcwd()
+    workspace = None
+    if cd is not None:
+        expanded_cd = os.path.expanduser(cd)
+        if not os.path.isdir(expanded_cd):
+            raise RuntimeError(f"--cd must be an existing directory: {expanded_cd}")
+        workspace = expanded_cd
+        startup_pwd = expanded_cd
+
+    startup_msg = f"codex exec bridge has started\npwd: {startup_pwd}"
     raw_exec_args = config.get("codex_exec_args", "")
     if isinstance(raw_exec_args, list):
         extra_args = [str(v) for v in raw_exec_args]
@@ -651,7 +657,7 @@ def run(
     cd: str | None = typer.Option(
         None,
         "--cd",
-        help="Pass through to `codex --cd` (defaults to `cd` in ~/.codex/telegram.toml).",
+        help="Pass through to `codex --cd`.",
     ),
     model: str | None = typer.Option(
         None,
