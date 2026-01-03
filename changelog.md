@@ -1,5 +1,13 @@
 # changelog
 
+## v0.6.0 (2026-01-03)
+
+### changes
+
+- interactive onboarding: run `takopi` to set up bot token, chat id, and default engine via guided prompts
+- lockfile to prevent multiple takopi instances from racing the same bot token
+- re-run onboarding anytime with `takopi --onboard`
+
 ## v0.5.3 (2026-01-02)
 
 ### changes

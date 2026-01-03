@@ -34,7 +34,7 @@ parallel runs across threads, per thread queue support.
 
 ## setup
 
-run `takopi` in a TTY and follow the interactive prompts. it will:
+run `takopi` and follow the interactive prompts. it will:
 
 - help you create a bot token (via @BotFather)
 - capture your `chat_id` from the most recent message you send to the bot
