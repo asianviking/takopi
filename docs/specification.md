@@ -1,4 +1,4 @@
-# Takopi Specification v0.8.0 [2026-01-04]
+# Takopi Specification v0.8.0 [2026-01-05]
 
 This document is **normative**. The words **MUST**, **SHOULD**, and **MAY** express requirements.
 
@@ -431,7 +431,7 @@ The lock file SHOULD be removed on clean shutdown. Stale locks from crashed proc
 
 ## 11. Changelog
 
-### v0.8.0 (2026-01-04)
+### v0.8.0 (2026-01-05)
 
 - Add `subagent` action kind for agent/task delegation tools.
 - Add lockfile specification for single-instance enforcement (§10).

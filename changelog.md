@@ -1,5 +1,17 @@
 # changelog
 
+## v0.8.0 (2026-01-05)
+
+### changes
+
+- queue telegram requests with rate limits and retry-after backoff [#54](https://github.com/banteg/takopi/pull/54)
+
+### docs
+
+- improve documentation coverage [#52](https://github.com/banteg/takopi/pull/52)
+- align runner guide with factory pattern
+- add missing pr links in the changelog
+
 ## v0.7.0 (2026-01-04)
 
 ### changes
