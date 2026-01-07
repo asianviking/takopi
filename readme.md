@@ -6,7 +6,9 @@ telegram bridge for codex, claude code, opencode, pi, and [other agents](docs/ad
 
 ## features
 
-stateless resume, continue a thread in the chat or pick up in the terminal.
+projects and worktrees: register repos with `takopi init`, target them via `/project`, route to branches with `@branch`.
+
+stateless resume: continue a thread in the chat or pick up in the terminal.
 
 progress updates while agent runs (commands, tools, notes, file changes, elapsed time).
 
@@ -76,7 +78,7 @@ provider = "openai"
 extra_args = ["--no-color"]
 ```
 
-## projects (optional)
+## projects
 
 register the current repo as a project alias:
 
