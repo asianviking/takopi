@@ -35,7 +35,12 @@ from .runner_bridge import (
     handle_message,
 )
 from .transport import MessageRef, RenderedMessage, SendOptions, Transport
-from .transport_runtime import ResolvedMessage, ResolvedRunner, TransportRuntime
+from .transport_runtime import (
+    ResolvedMessage,
+    ResolvedRunner,
+    TransportMessageContext,
+    TransportRuntime,
+)
 from .transports import SetupResult, TransportBackend
 
 TAKOPI_PLUGIN_API_VERSION = 1
@@ -79,6 +84,7 @@ __all__ = [
     "TAKOPI_PLUGIN_API_VERSION",
     "Transport",
     "TransportBackend",
+    "TransportMessageContext",
     "TransportRuntime",
     "handle_message",
 ]

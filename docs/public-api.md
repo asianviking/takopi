@@ -48,6 +48,7 @@ dependencies = ["takopi>=0.11,<0.12"]
 | `SendOptions` | Reply/notify/replace flags |
 | `MessageRef` | Transport-specific message reference |
 | `TransportRuntime` | Transport runtime facade (routers/projects hidden) |
+| `TransportMessageContext` | Transport-provided context hints for fallback resolution |
 | `ResolvedMessage` | Parsed prompt + resume/context resolution |
 | `ResolvedRunner` | Runner selection result |
 
@@ -189,7 +190,7 @@ engine pipeline. Use `mode="capture"` to collect results and build a custom repl
 
 `TransportRuntime` keeps transports away from internal router/project types. Key helpers:
 
-- `resolve_message(text, reply_text)` → `ResolvedMessage` (prompt, resume token, context)
+- `resolve_message(text, reply_text, transport_context=None)` → `ResolvedMessage` (prompt, resume token, context)
 - `resolve_engine(engine_override, context)` → `EngineId`
 - `resolve_runner(resume_token, engine_override)` → `ResolvedRunner` (runner + availability info)
 - `resolve_run_cwd(context)` → `Path | None` (raises `ConfigError` for project/worktree issues)
@@ -198,6 +199,32 @@ engine pipeline. Use `mode="capture"` to collect results and build a custom repl
 - `project_aliases()`
 - `config_path` (active config path when available)
 - `plugin_config(plugin_id)` → `dict` from `[plugins.<id>]`
+
+---
+
+## TransportMessageContext
+
+`TransportMessageContext` allows transports to provide context hints that act as
+fallbacks when the user hasn't specified explicit directives:
+
+```py
+@dataclass(frozen=True, slots=True)
+class TransportMessageContext:
+    project_hint: str | None = None
+    branch_hint: str | None = None
+```
+
+**Resolution priority** (unchanged for explicit directives):
+
+1. Resume token from text/reply
+2. `/project` directive in message text
+3. `@branch` directive in message text
+4. Reply context line
+5. **Transport hint** (fallback when nothing explicit)
+6. Default project from config
+
+This enables transport-native organizational structures. For example, a Telegram
+transport with topics can map topics to projects automatically.
 
 ---
 

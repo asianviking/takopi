@@ -226,6 +226,47 @@ For most transports, you will want to call `handle_message()` from `takopi.api`
 inside your message loop. That function implements progress updates, resume handling,
 and cancellation semantics.
 
+### Transport context hints
+
+Transports can provide context hints using `TransportMessageContext` to map
+transport-native structures (like Telegram topics) to projects. These hints act
+as fallbacks when users don't specify explicit `/project` or `@branch` directives:
+
+```py
+from takopi.api import TransportMessageContext, TransportRuntime
+
+class TopicBasedTransport:
+    def __init__(self, runtime: TransportRuntime):
+        self.runtime = runtime
+        # Mapping of topic_id -> project alias
+        self.topic_to_project: dict[int, str] = {}
+
+    async def on_message(self, message: dict) -> None:
+        topic_id = message.get("message_thread_id")
+        text = message.get("text", "")
+        reply_text = get_reply_text(message)
+
+        # Build transport context from topic mapping
+        transport_context = None
+        if topic_id is not None:
+            project_alias = self.topic_to_project.get(topic_id)
+            if project_alias is not None:
+                transport_context = TransportMessageContext(
+                    project_hint=project_alias
+                )
+
+        # resolve_message uses the hint as a fallback
+        resolved = self.runtime.resolve_message(
+            text=text,
+            reply_text=reply_text,
+            transport_context=transport_context,
+        )
+        # resolved.context.project is now set even without /project in text
+```
+
+Users can still override the default by using `/project` or `@branch` directives
+in their message. The transport hint only applies when no explicit directive is given.
+
 ---
 
 ## Command backend plugins

@@ -16,6 +16,19 @@ from .worktrees import WorktreeError, resolve_run_cwd
 
 
 @dataclass(frozen=True, slots=True)
+class TransportMessageContext:
+    """Transport-provided context hints, used as fallbacks.
+
+    Transports can pass this to `resolve_message()` to provide default
+    project/branch context when the user hasn't specified explicit directives.
+    For example, a Telegram transport might map topics to projects.
+    """
+
+    project_hint: str | None = None
+    branch_hint: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ResolvedMessage:
     prompt: str
     resume_token: ResumeToken | None
@@ -110,7 +123,13 @@ class TransportRuntime:
             )
         return dict(raw)
 
-    def resolve_message(self, *, text: str, reply_text: str | None) -> ResolvedMessage:
+    def resolve_message(
+        self,
+        *,
+        text: str,
+        reply_text: str | None,
+        transport_context: TransportMessageContext | None = None,
+    ) -> ResolvedMessage:
         directives = parse_directives(
             text,
             engine_ids=self._router.engine_ids,
@@ -141,12 +160,22 @@ class TransportRuntime:
             )
 
         project_key = directives.project
+        branch_key = directives.branch
+
+        # Apply transport hints as fallbacks when no explicit directives
+        if transport_context is not None:
+            if project_key is None and transport_context.project_hint is not None:
+                project_key = transport_context.project_hint
+            if branch_key is None and transport_context.branch_hint is not None:
+                branch_key = transport_context.branch_hint
+
+        # Fall back to default project from config
         if project_key is None and self._projects.default_project is not None:
             project_key = self._projects.default_project
 
         context = None
-        if project_key is not None or directives.branch is not None:
-            context = RunContext(project=project_key, branch=directives.branch)
+        if project_key is not None or branch_key is not None:
+            context = RunContext(project=project_key, branch=branch_key)
 
         engine_override = directives.engine
         if engine_override is None and project_key is not None:
