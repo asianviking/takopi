@@ -18,6 +18,8 @@ parallel runs across threads, per thread queue support.
 
 `/cancel` a running task.
 
+optional voice note transcription for Telegram (routes transcript like typed text).
+
 ## requirements
 
 - `uv` for installation (`curl -LsSf https://astral.sh/uv/install.sh | sh`)
@@ -59,6 +61,9 @@ transport = "telegram"
 [transports.telegram]
 bot_token = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
 chat_id = 123456789
+voice_transcription = true
+
+# set OPENAI_API_KEY in your environment for voice transcription
 
 [codex]
 # optional: profile from ~/.codex/config.toml

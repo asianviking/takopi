@@ -25,6 +25,7 @@ class TelegramTransportSettings(BaseModel):
 
     bot_token: SecretStr | None = None
     chat_id: int | None = None
+    voice_transcription: bool = False
 
     @field_validator("bot_token", mode="before")
     @classmethod

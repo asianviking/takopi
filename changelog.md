@@ -1,5 +1,19 @@
 # changelog
 
+## v0.12.0 (2026-01-09)
+
+### changes
+
+- add optional Telegram voice note transcription (routes transcript like typed text) [#74](https://github.com/banteg/takopi/pull/74)
+
+### fixes
+
+- fix plugin allowlist matching and Windows session paths [#72](https://github.com/banteg/takopi/pull/72)
+
+### docs
+
+- document Telegram voice transcription settings [#74](https://github.com/banteg/takopi/pull/74)
+
 ## v0.11.0 (2026-01-08)
 
 ### changes
