@@ -833,10 +833,12 @@ async def handle_message_ralph(
             context_line=context_line,
             header_suffix=make_loop_suffix(),
         )
-        final_rendered = cfg.presenter.render_progress(
+        # Use render_final instead of render_progress to ensure button is cleared
+        final_rendered = cfg.presenter.render_final(
             state,
             elapsed_s=elapsed,
-            label="`cancelled`",
+            status="`cancelled`",
+            answer="",
         )
         await send_result_message(
             cfg,
