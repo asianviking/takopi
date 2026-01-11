@@ -318,6 +318,7 @@ def _make_cfg(
         chat_id=123,
         startup_msg="",
         exec_cfg=exec_cfg,
+        message_batch_window_ms=0,
     )
 
 
@@ -948,6 +949,7 @@ async def test_handle_file_put_writes_file(tmp_path: Path) -> None:
         startup_msg="",
         exec_cfg=exec_cfg,
         files=TelegramFilesSettings(enabled=True),
+        message_batch_window_ms=0,
     )
     msg = TelegramIncomingMessage(
         transport="telegram",
@@ -1014,6 +1016,7 @@ async def test_handle_file_get_sends_document_for_allowed_user(
             enabled=True,
             allowed_user_ids=[42],
         ),
+        message_batch_window_ms=0,
     )
     msg = TelegramIncomingMessage(
         transport="telegram",
@@ -1535,6 +1538,7 @@ async def test_run_main_loop_routes_reply_to_running_resume() -> None:
         chat_id=123,
         startup_msg="",
         exec_cfg=exec_cfg,
+        message_batch_window_ms=0,
     )
 
     async def poller(_cfg: TelegramBridgeConfig):
@@ -1628,6 +1632,7 @@ async def test_run_main_loop_persists_topic_sessions_in_project_scope(
             enabled=True,
             scope="projects",
         ),
+        message_batch_window_ms=0,
     )
 
     async def poller(_cfg: TelegramBridgeConfig):
@@ -2420,6 +2425,7 @@ async def test_run_main_loop_replies_in_same_thread() -> None:
         chat_id=123,
         startup_msg="",
         exec_cfg=exec_cfg,
+        message_batch_window_ms=0,
     )
 
     async def poller(_cfg: TelegramBridgeConfig):
@@ -2494,6 +2500,7 @@ async def test_run_main_loop_batches_media_group_upload(
         startup_msg="",
         exec_cfg=exec_cfg,
         files=TelegramFilesSettings(enabled=True, auto_put=True),
+        message_batch_window_ms=0,
     )
     msg1 = TelegramIncomingMessage(
         transport="telegram",
@@ -2598,6 +2605,7 @@ async def test_run_main_loop_handles_command_plugins(monkeypatch) -> None:
         chat_id=123,
         startup_msg="",
         exec_cfg=exec_cfg,
+        message_batch_window_ms=0,
     )
 
     async def poller(_cfg: TelegramBridgeConfig):
@@ -2683,6 +2691,7 @@ async def test_run_main_loop_command_uses_project_default_engine(
         chat_id=123,
         startup_msg="",
         exec_cfg=exec_cfg,
+        message_batch_window_ms=0,
     )
 
     async def poller(_cfg: TelegramBridgeConfig):
@@ -2767,6 +2776,7 @@ async def test_run_main_loop_command_defaults_to_chat_project(
         chat_id=123,
         startup_msg="",
         exec_cfg=exec_cfg,
+        message_batch_window_ms=0,
     )
 
     async def poller(_cfg: TelegramBridgeConfig):
@@ -2835,6 +2845,7 @@ async def test_run_main_loop_refreshes_command_ids(monkeypatch) -> None:
         chat_id=123,
         startup_msg="",
         exec_cfg=exec_cfg,
+        message_batch_window_ms=0,
     )
 
     async def poller(_cfg: TelegramBridgeConfig):

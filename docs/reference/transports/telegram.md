@@ -80,6 +80,31 @@ message_overflow = "split" # trim | split
 Split mode sends multiple messages. Each chunk includes the footer; follow-up
 chunks add a "continued (N/M)" header.
 
+## Message batching
+
+When forwarding messages or sending multiple related messages in quick succession,
+takopi can batch them into a single prompt. This is useful when forwarding error
+logs with commentary—the forwarded content and your notes arrive as separate
+Telegram messages but should be processed together.
+
+Configuration (under `[transports.telegram]`):
+
+```toml
+message_batch_window_ms = 200.0  # default: 200ms
+```
+
+Behavior:
+
+- Messages are grouped by topic key (chat_id + thread_id).
+- After receiving a message, takopi waits for the configured window before
+  dispatching. If more messages arrive, the window resets.
+- Multiple messages are combined with newlines as separator.
+- The first message's resume token, context, and engine override are used.
+- The reply is sent to the last message in the batch.
+- Slash commands bypass batching and are processed immediately. Any pending
+  messages for that topic are flushed first.
+- Set `message_batch_window_ms = 0` to disable batching entirely.
+
 ## Forum topics (optional)
 
 If you chose the **workspace** workflow during onboarding, topics are already enabled.

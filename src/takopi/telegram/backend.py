@@ -140,6 +140,7 @@ class TelegramBackend(TransportBackend):
             voice_transcription_model=settings.voice_transcription_model,
             topics=settings.topics,
             files=settings.files,
+            message_batch_window_ms=float(settings.message_batch_window_ms),
         )
 
         async def run_loop() -> None:
