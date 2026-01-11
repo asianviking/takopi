@@ -10,6 +10,7 @@ import takopi.telegram.bridge as bridge
 from takopi.directives import parse_directives
 from takopi.telegram.bridge import (
     TelegramBridgeConfig,
+    TelegramFilesConfig,
     TelegramPresenter,
     TelegramTransport,
     _build_bot_commands,
@@ -30,7 +31,11 @@ from takopi.progress import ProgressTracker
 from takopi.router import AutoRouter, RunnerEntry
 from takopi.transport_runtime import TransportRuntime
 from takopi.runners.mock import Return, ScriptRunner, Sleep, Wait
-from takopi.telegram.types import TelegramCallbackQuery, TelegramIncomingMessage
+from takopi.telegram.types import (
+    TelegramCallbackQuery,
+    TelegramDocument,
+    TelegramIncomingMessage,
+)
 from takopi.transport import MessageRef, RenderedMessage, SendOptions
 from tests.plugin_fixtures import FakeEntryPoint, install_entrypoints
 
@@ -100,6 +105,7 @@ class _FakeBot(BotClient):
         self.command_calls: list[dict] = []
         self.callback_calls: list[dict] = []
         self.send_calls: list[dict] = []
+        self.document_calls: list[dict] = []
         self.edit_calls: list[dict] = []
         self.edit_topic_calls: list[dict[str, Any]] = []
         self.delete_calls: list[dict] = []
@@ -150,6 +156,29 @@ class _FakeBot(BotClient):
             }
         )
         return {"message_id": 1}
+
+    async def send_document(
+        self,
+        chat_id: int,
+        filename: str,
+        content: bytes,
+        reply_to_message_id: int | None = None,
+        message_thread_id: int | None = None,
+        disable_notification: bool | None = False,
+        caption: str | None = None,
+    ) -> dict[str, Any]:
+        self.document_calls.append(
+            {
+                "chat_id": chat_id,
+                "filename": filename,
+                "content": content,
+                "reply_to_message_id": reply_to_message_id,
+                "message_thread_id": message_thread_id,
+                "disable_notification": disable_notification,
+                "caption": caption,
+            }
+        )
+        return {"message_id": 2}
 
     async def edit_message_text(
         self,
@@ -331,6 +360,7 @@ def test_build_bot_commands_includes_cancel_and_engine() -> None:
     commands = _build_bot_commands(runtime)
 
     assert {"command": "cancel", "description": "cancel run"} in commands
+    assert {"command": "file", "description": "upload or fetch files"} in commands
     assert any(cmd["command"] == "codex" for cmd in commands)
 
 
@@ -529,6 +559,27 @@ async def test_telegram_transport_edit_wait_false_returns_ref() -> None:
             _ = reply_markup
             return None
 
+        async def send_document(
+            self,
+            chat_id: int,
+            filename: str,
+            content: bytes,
+            reply_to_message_id: int | None = None,
+            message_thread_id: int | None = None,
+            disable_notification: bool | None = False,
+            caption: str | None = None,
+        ) -> dict | None:
+            _ = (
+                chat_id,
+                filename,
+                content,
+                reply_to_message_id,
+                message_thread_id,
+                disable_notification,
+                caption,
+            )
+            return None
+
         async def edit_message_text(
             self,
             chat_id: int,
@@ -713,6 +764,130 @@ async def test_handle_cancel_only_cancels_matching_progress_message() -> None:
     assert task_first.cancel_requested.is_set() is True
     assert task_second.cancel_requested.is_set() is False
     assert len(transport.send_calls) == 0
+
+
+@pytest.mark.anyio
+async def test_handle_file_put_writes_file(tmp_path: Path) -> None:
+    payload = b"hello"
+
+    class _FileBot(_FakeBot):
+        async def get_file(self, file_id: str) -> dict[str, Any] | None:
+            _ = file_id
+            return {"file_path": "files/hello.txt"}
+
+        async def download_file(self, file_path: str) -> bytes | None:
+            _ = file_path
+            return payload
+
+    transport = _FakeTransport()
+    bot = _FileBot()
+    runner = ScriptRunner([Return(answer="ok")], engine=CODEX_ENGINE)
+    projects = ProjectsConfig(
+        projects={
+            "proj": ProjectConfig(
+                alias="proj",
+                path=tmp_path,
+                worktrees_dir=Path(".worktrees"),
+            )
+        },
+        default_project=None,
+    )
+    runtime = TransportRuntime(router=_make_router(runner), projects=projects)
+    exec_cfg = ExecBridgeConfig(
+        transport=transport,
+        presenter=MarkdownPresenter(),
+        final_notify=True,
+    )
+    cfg = TelegramBridgeConfig(
+        bot=bot,
+        runtime=runtime,
+        chat_id=123,
+        startup_msg="",
+        exec_cfg=exec_cfg,
+        files=TelegramFilesConfig(enabled=True),
+    )
+    msg = TelegramIncomingMessage(
+        transport="telegram",
+        chat_id=123,
+        message_id=10,
+        text="",
+        reply_to_message_id=None,
+        reply_to_text=None,
+        sender_id=321,
+        chat_type="private",
+        document=TelegramDocument(
+            file_id="doc-id",
+            file_name="hello.txt",
+            mime_type="text/plain",
+            file_size=len(payload),
+            raw={"file_id": "doc-id"},
+        ),
+    )
+
+    await bridge._handle_file_put(cfg, msg, "/proj uploads/hello.txt", None, None)
+
+    target = tmp_path / "uploads" / "hello.txt"
+    assert target.read_bytes() == payload
+    assert transport.send_calls
+    text = transport.send_calls[-1]["message"].text
+    assert "saved uploads/hello.txt" in text
+    assert "(5 b)" in text
+
+
+@pytest.mark.anyio
+async def test_handle_file_get_sends_document_for_allowed_user(
+    tmp_path: Path,
+) -> None:
+    payload = b"fetch"
+    target = tmp_path / "hello.txt"
+    target.write_bytes(payload)
+
+    transport = _FakeTransport()
+    bot = _FakeBot()
+    runner = ScriptRunner([Return(answer="ok")], engine=CODEX_ENGINE)
+    projects = ProjectsConfig(
+        projects={
+            "proj": ProjectConfig(
+                alias="proj",
+                path=tmp_path,
+                worktrees_dir=Path(".worktrees"),
+            )
+        },
+        default_project=None,
+    )
+    runtime = TransportRuntime(router=_make_router(runner), projects=projects)
+    exec_cfg = ExecBridgeConfig(
+        transport=transport,
+        presenter=MarkdownPresenter(),
+        final_notify=True,
+    )
+    cfg = TelegramBridgeConfig(
+        bot=bot,
+        runtime=runtime,
+        chat_id=123,
+        startup_msg="",
+        exec_cfg=exec_cfg,
+        files=TelegramFilesConfig(
+            enabled=True,
+            allowed_user_ids=frozenset({42}),
+        ),
+    )
+    msg = TelegramIncomingMessage(
+        transport="telegram",
+        chat_id=-100,
+        message_id=10,
+        text="",
+        reply_to_message_id=None,
+        reply_to_text=None,
+        sender_id=42,
+        chat_type="supergroup",
+    )
+
+    await bridge._handle_file_get(cfg, msg, "/proj hello.txt", None, None)
+
+    assert bot.document_calls
+    assert bot.document_calls[0]["filename"] == "hello.txt"
+    assert bot.document_calls[0]["content"] == payload
 
 
 @pytest.mark.anyio
@@ -1167,6 +1342,122 @@ async def test_run_main_loop_replies_in_same_thread() -> None:
     ]
     assert reply_calls
     assert all(call["options"].thread_id == 77 for call in reply_calls)
+
+
+@pytest.mark.anyio
+async def test_run_main_loop_batches_media_group_upload(
+    tmp_path: Path,
+) -> None:
+    payloads = {
+        "photos/file_1.jpg": b"one",
+        "photos/file_2.jpg": b"two",
+    }
+    file_map = {
+        "doc-1": "photos/file_1.jpg",
+        "doc-2": "photos/file_2.jpg",
+    }
+
+    class _MediaBot(_FakeBot):
+        async def get_file(self, file_id: str) -> dict[str, Any] | None:
+            file_path = file_map.get(file_id)
+            if file_path is None:
+                return None
+            return {"file_path": file_path}
+
+        async def download_file(self, file_path: str) -> bytes | None:
+            return payloads.get(file_path)
+
+    transport = _FakeTransport()
+    bot = _MediaBot()
+    runner = ScriptRunner([Return(answer="ok")], engine=CODEX_ENGINE)
+    projects = ProjectsConfig(
+        projects={
+            "proj": ProjectConfig(
+                alias="proj",
+                path=tmp_path,
+                worktrees_dir=Path(".worktrees"),
+            )
+        },
+        default_project=None,
+    )
+    runtime = TransportRuntime(router=_make_router(runner), projects=projects)
+    exec_cfg = ExecBridgeConfig(
+        transport=transport,
+        presenter=MarkdownPresenter(),
+        final_notify=True,
+    )
+    cfg = TelegramBridgeConfig(
+        bot=bot,
+        runtime=runtime,
+        chat_id=123,
+        startup_msg="",
+        exec_cfg=exec_cfg,
+        files=TelegramFilesConfig(enabled=True, auto_put=True),
+    )
+    msg1 = TelegramIncomingMessage(
+        transport="telegram",
+        chat_id=123,
+        message_id=1,
+        text="/file put /proj incoming/test1",
+        reply_to_message_id=None,
+        reply_to_text=None,
+        sender_id=321,
+        chat_type="private",
+        media_group_id="grp-1",
+        document=TelegramDocument(
+            file_id="doc-1",
+            file_name=None,
+            mime_type="image/jpeg",
+            file_size=len(payloads["photos/file_1.jpg"]),
+            raw={"file_id": "doc-1"},
+        ),
+    )
+    msg2 = TelegramIncomingMessage(
+        transport="telegram",
+        chat_id=123,
+        message_id=2,
+        text="",
+        reply_to_message_id=None,
+        reply_to_text=None,
+        sender_id=321,
+        chat_type="private",
+        media_group_id="grp-1",
+        document=TelegramDocument(
+            file_id="doc-2",
+            file_name=None,
+            mime_type="image/jpeg",
+            file_size=len(payloads["photos/file_2.jpg"]),
+            raw={"file_id": "doc-2"},
+        ),
+    )
+
+    stop_polling = anyio.Event()
+
+    async def poller(_cfg: TelegramBridgeConfig):
+        yield msg1
+        yield msg2
+        await stop_polling.wait()
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(run_main_loop, cfg, poller)
+        try:
+            with anyio.fail_after(3):
+                while len(transport.send_calls) < 1:
+                    await anyio.sleep(0.05)
+            assert len(transport.send_calls) == 1
+            text = transport.send_calls[0]["message"].text
+            assert "saved file_1.jpg, file_2.jpg" in text
+            assert "to incoming/test1/" in text
+            target_dir = tmp_path / "incoming" / "test1"
+            assert (target_dir / "file_1.jpg").read_bytes() == payloads[
+                "photos/file_1.jpg"
+            ]
+            assert (target_dir / "file_2.jpg").read_bytes() == payloads[
+                "photos/file_2.jpg"
+            ]
+        finally:
+            stop_polling.set()
+            tg.cancel_scope.cancel()
 
 
 @pytest.mark.anyio

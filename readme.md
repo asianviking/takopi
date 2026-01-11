@@ -20,6 +20,8 @@ parallel runs across threads, per thread queue support.
 
 optional voice note transcription for telegram (routes transcript like typed text).
 
+telegram file transfer: upload documents into repos (`/file put`) and fetch files back (`/file get`).
+
 telegram forum topics: bind a topic to a project/branch and keep per-topic session resumes.
 
 per-project chat routing: assign different telegram chats to different projects.
@@ -70,6 +72,11 @@ transport = "telegram"
 bot_token = "123456789:ABCdefGHIjklMNOpqrsTUVwxyz"
 chat_id = 123456789
 voice_transcription = true
+
+[transports.telegram.files]
+enabled = true
+auto_put = true
+allowed_user_ids = [123456789]
 
 [transports.telegram.topics]
 enabled = true
