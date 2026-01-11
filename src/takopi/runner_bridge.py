@@ -655,7 +655,8 @@ async def handle_message_ralph(
     )
 
     def make_loop_label(base: str) -> str:
-        return f"{base} · loop {ralph_state.current_iteration}/{ralph_state.max_iterations}"
+        iteration = ralph_state.current_iteration or 1  # Show 1 before first iteration starts
+        return f"{base} · loop {iteration}/{ralph_state.max_iterations}"
 
     progress_state = await send_initial_progress(
         cfg,
