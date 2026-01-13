@@ -37,12 +37,9 @@ def _log_runner_event(evt: TakopiEvent) -> None:
 
 
 def _strip_resume_lines(text: str, *, is_resume_line: Callable[[str], bool]) -> str:
-    stripped_lines: list[str] = []
-    for line in text.splitlines():
-        if is_resume_line(line):
-            continue
-        stripped_lines.append(line)
-    prompt = "\n".join(stripped_lines).strip()
+    prompt = "\n".join(
+        line for line in text.splitlines() if not is_resume_line(line)
+    ).strip()
     return prompt or "continue"
 
 
@@ -83,14 +80,14 @@ class IncomingMessage:
     thread_id: ThreadId | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExecBridgeConfig:
     transport: Transport
     presenter: Presenter
     final_notify: bool
 
 
-@dataclass
+@dataclass(slots=True)
 class RunningTask:
     resume: ResumeToken | None = None
     resume_ready: anyio.Event = field(default_factory=anyio.Event)

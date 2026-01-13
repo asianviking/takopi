@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
-import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Generic, Protocol, TypeVar
+from typing import Any, Protocol
 
 import anyio
 import msgspec
 
-T = TypeVar("T", bound="_VersionedState")
+from ..utils.json_state import atomic_write_json
 
 
 class _Logger(Protocol):
@@ -19,7 +18,7 @@ class _VersionedState(Protocol):
     version: int
 
 
-class JsonStateStore(Generic[T]):
+class JsonStateStore[T: _VersionedState]:
     def __init__(
         self,
         path: Path,
@@ -84,11 +83,6 @@ class JsonStateStore(Generic[T]):
         self._state = payload
 
     def _save_locked(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
         payload = msgspec.to_builtins(self._state)
-        tmp_path = self._path.with_suffix(f"{self._path.suffix}.tmp")
-        with open(tmp_path, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2, sort_keys=True)
-            handle.write("\n")
-        os.replace(tmp_path, self._path)
+        atomic_write_json(self._path, payload)
         self._mtime_ns = self._stat_mtime_ns()

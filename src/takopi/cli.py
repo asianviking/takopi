@@ -256,7 +256,7 @@ def _run_auto_router(
             )
         lock_token = transport_backend.lock_token(
             transport_config=transport_config,
-            config_path=config_path,
+            _config_path=config_path,
         )
         lock_handle = acquire_config_lock(config_path, lock_token)
         runtime = spec.to_runtime(config_path=config_path)
@@ -301,10 +301,7 @@ def _default_alias_from_path(path: Path) -> str | None:
 
 
 def _ensure_projects_table(config: dict, config_path: Path) -> dict:
-    projects = config.get("projects")
-    if projects is None:
-        projects = {}
-        config["projects"] = projects
+    projects = config.setdefault("projects", {})
     if not isinstance(projects, dict):
         raise ConfigError(f"Invalid `projects` in {config_path}; expected a table.")
     return projects

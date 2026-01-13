@@ -6,8 +6,9 @@ import anyio
 import pytest
 
 from takopi import commands, plugins
+from takopi.telegram.commands.executor import _CaptureTransport, _run_engine
+from takopi.telegram.commands.file_transfer import _handle_file_get, _handle_file_put
 import takopi.telegram.loop as telegram_loop
-import takopi.telegram.commands as telegram_commands
 import takopi.telegram.topics as telegram_topics
 from takopi.directives import parse_directives
 from takopi.telegram.api_models import (
@@ -39,7 +40,7 @@ from takopi.context import RunContext
 from takopi.config import ProjectConfig, ProjectsConfig
 from takopi.runner_bridge import ExecBridgeConfig, RunningTask
 from takopi.markdown import MarkdownPresenter
-from takopi.model import EngineId, ResumeToken
+from takopi.model import ResumeToken
 from takopi.progress import ProgressTracker
 from takopi.router import AutoRouter, RunnerEntry
 from takopi.transport_runtime import TransportRuntime
@@ -52,7 +53,7 @@ from takopi.telegram.types import (
 from takopi.transport import MessageRef, RenderedMessage, SendOptions
 from tests.plugin_fixtures import FakeEntryPoint, install_entrypoints
 
-CODEX_ENGINE = EngineId("codex")
+CODEX_ENGINE = "codex"
 
 
 def _empty_projects() -> ProjectsConfig:
@@ -905,9 +906,7 @@ async def test_handle_file_put_writes_file(tmp_path: Path) -> None:
         ),
     )
 
-    await telegram_commands._handle_file_put(
-        cfg, msg, "/proj uploads/hello.txt", None, None
-    )
+    await _handle_file_put(cfg, msg, "/proj uploads/hello.txt", None, None)
 
     target = tmp_path / "uploads" / "hello.txt"
     assert target.read_bytes() == payload
@@ -966,7 +965,7 @@ async def test_handle_file_get_sends_document_for_allowed_user(
         chat_type="supergroup",
     )
 
-    await telegram_commands._handle_file_get(cfg, msg, "/proj hello.txt", None, None)
+    await _handle_file_get(cfg, msg, "/proj hello.txt", None, None)
 
     assert bot.document_calls
     assert bot.document_calls[0]["filename"] == "hello.txt"
@@ -1263,7 +1262,7 @@ async def test_send_with_resume_reports_when_missing() -> None:
 
 @pytest.mark.anyio
 async def test_run_engine_hides_resume_line_in_topics() -> None:
-    transport = telegram_commands._CaptureTransport()
+    transport = _CaptureTransport()
     runner = ScriptRunner(
         [Return(answer="ok")],
         engine=CODEX_ENGINE,
@@ -1279,7 +1278,7 @@ async def test_run_engine_hides_resume_line_in_topics() -> None:
         projects=_empty_projects(),
     )
 
-    await telegram_commands._run_engine(
+    await _run_engine(
         exec_cfg=exec_cfg,
         runtime=runtime,
         running_tasks={},
@@ -1456,14 +1455,14 @@ async def test_run_main_loop_auto_resumes_topic_default_engine(
         123, 77, ResumeToken(engine=CODEX_ENGINE, value="resume-codex")
     )
     await store.set_session_resume(
-        123, 77, ResumeToken(engine=EngineId("claude"), value="resume-claude")
+        123, 77, ResumeToken(engine="claude", value="resume-claude")
     )
     await store.set_default_engine(123, 77, "claude")
 
     transport = _FakeTransport()
     bot = _FakeBot()
     codex_runner = ScriptRunner([Return(answer="ok")], engine=CODEX_ENGINE)
-    claude_runner = ScriptRunner([Return(answer="ok")], engine=EngineId("claude"))
+    claude_runner = ScriptRunner([Return(answer="ok")], engine="claude")
     router = AutoRouter(
         entries=[
             RunnerEntry(engine=codex_runner.engine, runner=codex_runner),
@@ -1521,7 +1520,7 @@ async def test_run_main_loop_auto_resumes_topic_default_engine(
     assert codex_runner.calls == []
     assert len(claude_runner.calls) == 1
     assert claude_runner.calls[0][1] == ResumeToken(
-        engine=EngineId("claude"), value="resume-claude"
+        engine="claude", value="resume-claude"
     )
 
 
@@ -2443,7 +2442,7 @@ async def test_run_main_loop_command_uses_project_default_engine(
     transport = _FakeTransport()
     bot = _FakeBot()
     codex_runner = ScriptRunner([Return(answer="ok")], engine=CODEX_ENGINE)
-    pi_runner = ScriptRunner([Return(answer="ok")], engine=EngineId("pi"))
+    pi_runner = ScriptRunner([Return(answer="ok")], engine="pi")
     router = AutoRouter(
         entries=[
             RunnerEntry(engine=codex_runner.engine, runner=codex_runner),
@@ -2525,7 +2524,7 @@ async def test_run_main_loop_command_defaults_to_chat_project(
     transport = _FakeTransport()
     bot = _FakeBot()
     codex_runner = ScriptRunner([Return(answer="ok")], engine=CODEX_ENGINE)
-    pi_runner = ScriptRunner([Return(answer="ok")], engine=EngineId("pi"))
+    pi_runner = ScriptRunner([Return(answer="ok")], engine="pi")
     router = AutoRouter(
         entries=[
             RunnerEntry(engine=codex_runner.engine, runner=codex_runner),

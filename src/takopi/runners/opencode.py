@@ -35,11 +35,12 @@ from ..model import (
 )
 from ..runner import JsonlSubprocessRunner, ResumeTokenMixin, Runner
 from ..schemas import opencode as opencode_schema
-from ..utils.paths import relativize_command, relativize_path
+from ..utils.paths import relativize_path
+from .tool_actions import tool_input_path, tool_kind_and_title
 
 logger = get_logger(__name__)
 
-ENGINE: EngineId = EngineId("opencode")
+ENGINE: EngineId = "opencode"
 
 _RESUME_RE = re.compile(
     r"(?im)^\s*`?opencode(?:\s+run)?\s+(?:--session|-s)\s+(?P<token>ses_[A-Za-z0-9]+)`?\s*$"
@@ -79,54 +80,12 @@ def _action_event(
 def _tool_kind_and_title(
     tool_name: str, tool_input: dict[str, Any]
 ) -> tuple[ActionKind, str]:
-    """Map OpenCode tool names to Takopi action kinds and titles."""
-    name_lower = tool_name.lower()
-
-    if name_lower in {"bash", "shell"}:
-        command = tool_input.get("command")
-        display = relativize_command(str(command or tool_name))
-        return "command", display
-
-    if name_lower in {"edit", "write", "multiedit"}:
-        path = tool_input.get("file_path") or tool_input.get("filePath")
-        if path:
-            return "file_change", relativize_path(str(path))
-        return "file_change", str(tool_name)
-
-    if name_lower == "read":
-        path = tool_input.get("file_path") or tool_input.get("filePath")
-        if path:
-            return "tool", f"read: `{relativize_path(str(path))}`"
-        return "tool", "read"
-
-    if name_lower == "glob":
-        pattern = tool_input.get("pattern")
-        if pattern:
-            return "tool", f"glob: `{pattern}`"
-        return "tool", "glob"
-
-    if name_lower == "grep":
-        pattern = tool_input.get("pattern")
-        if pattern:
-            return "tool", f"grep: {pattern}"
-        return "tool", "grep"
-
-    if name_lower in {"websearch", "web_search"}:
-        query = tool_input.get("query")
-        return "web_search", str(query or "search")
-
-    if name_lower in {"webfetch", "web_fetch"}:
-        url = tool_input.get("url")
-        return "web_search", str(url or "fetch")
-
-    if name_lower in {"todowrite", "todoread"}:
-        return "note", "update todos" if "write" in name_lower else "read todos"
-
-    if name_lower == "task":
-        desc = tool_input.get("description") or tool_input.get("prompt")
-        return "tool", str(desc or tool_name)
-
-    return "tool", tool_name
+    return tool_kind_and_title(
+        tool_name,
+        tool_input,
+        path_keys=("file_path", "filePath"),
+        task_kind="tool",
+    )
 
 
 def _normalize_tool_title(
@@ -137,10 +96,10 @@ def _normalize_tool_title(
     if "`" in title:
         return title
 
-    path = tool_input.get("file_path") or tool_input.get("filePath")
+    path = tool_input_path(tool_input, path_keys=("file_path", "filePath"))
     if isinstance(path, str) and path:
         rel_path = relativize_path(path)
-        if title == path or title == rel_path:
+        if title in (path, rel_path):
             return f"`{rel_path}`"
 
     return title
@@ -190,9 +149,8 @@ def translate_opencode_event(
     """Translate an OpenCode JSON event into Takopi events."""
     session_id = event.sessionID
 
-    if isinstance(session_id, str) and session_id:
-        if state.session_id is None:
-            state.session_id = session_id
+    if isinstance(session_id, str) and session_id and state.session_id is None:
+        state.session_id = session_id
 
     match event:
         case opencode_schema.StepStart():
@@ -340,7 +298,7 @@ def translate_opencode_event(
             return []
 
 
-@dataclass
+@dataclass(slots=True)
 class OpenCodeRunner(ResumeTokenMixin, JsonlSubprocessRunner):
     """Runner for OpenCode CLI."""
 

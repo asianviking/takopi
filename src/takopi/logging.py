@@ -107,9 +107,8 @@ def _redact_value(value: Any, memo: dict[int, Any]) -> Any:
 
 
 def _redact_event_dict(
-    logger: Any, method_name: str, event_dict: dict[str, Any]
+    _logger: Any, _method_name: str, event_dict: dict[str, Any]
 ) -> dict[str, Any]:
-    _ = logger, method_name
     return _redact_value(event_dict, memo={})
 
 
@@ -222,10 +221,7 @@ def setup_logging(
 
     format_value = os.environ.get("TAKOPI_LOG_FORMAT", "console").strip().lower()
     color_override = os.environ.get("TAKOPI_LOG_COLOR")
-    if color_override is None:
-        is_tty = sys.stdout.isatty()
-    else:
-        is_tty = _truthy(color_override)
+    is_tty = sys.stdout.isatty() if color_override is None else _truthy(color_override)
     if format_value == "json":
         renderer: Any = structlog.processors.JSONRenderer(default=str)
     else:
@@ -242,7 +238,9 @@ def setup_logging(
             _log_file_handle = None
     if log_file:
         try:
-            _log_file_handle = open(log_file, "a", encoding="utf-8")
+            _log_file_handle = open(  # noqa: SIM115
+                log_file, "a", encoding="utf-8"
+            )
         except OSError:
             _log_file_handle = None
 

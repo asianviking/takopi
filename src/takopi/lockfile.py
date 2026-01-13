@@ -11,7 +11,7 @@ from .logging import get_logger
 logger = get_logger(__name__)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class LockInfo:
     pid: int | None
     token_fingerprint: str | None
@@ -29,7 +29,7 @@ class LockError(RuntimeError):
         super().__init__(_format_lock_message(path, state))
 
 
-@dataclass
+@dataclass(slots=True)
 class LockHandle:
     path: Path
 
@@ -44,7 +44,7 @@ class LockHandle:
                 error_type=exc.__class__.__name__,
             )
 
-    def __enter__(self) -> "LockHandle":
+    def __enter__(self) -> LockHandle:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
+from collections.abc import Iterable
 
 from .backends import EngineBackend, SetupIssue
 from .plugins import TRANSPORT_GROUP, list_ids, load_plugin_backend
@@ -34,7 +35,7 @@ class TransportBackend(Protocol):
     def interactive_setup(self, *, force: bool) -> bool: ...
 
     def lock_token(
-        self, *, transport_config: object, config_path: Path
+        self, *, transport_config: object, _config_path: Path
     ) -> str | None: ...
 
     def build_and_run(

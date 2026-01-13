@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import re
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path, PurePath
 from typing import Any
 from uuid import uuid4
@@ -27,11 +27,12 @@ from ..model import (
 )
 from ..runner import JsonlSubprocessRunner, ResumeTokenMixin, Runner
 from ..schemas import pi as pi_schema
-from ..utils.paths import get_run_base_dir, relativize_command, relativize_path
+from ..utils.paths import get_run_base_dir
+from .tool_actions import tool_kind_and_title
 
 logger = get_logger(__name__)
 
-ENGINE: EngineId = EngineId("pi")
+ENGINE: EngineId = "pi"
 
 _RESUME_RE = re.compile(r"(?im)^\s*`?pi\s+--session\s+(?P<token>.+?)`?\s*$")
 
@@ -96,32 +97,7 @@ def _tool_kind_and_title(
     name: str,
     args: dict[str, Any],
 ) -> tuple[ActionKind, str]:
-    tool = name.lower()
-    if tool == "bash":
-        command = args.get("command")
-        return "command", relativize_command(str(command or "bash"))
-    if tool in {"edit", "write"}:
-        path = args.get("path")
-        if path:
-            return "file_change", relativize_path(str(path))
-        return "file_change", tool
-    if tool == "read":
-        path = args.get("path")
-        if path:
-            return "tool", f"read: `{relativize_path(str(path))}`"
-        return "tool", "read"
-    if tool == "grep":
-        pattern = args.get("pattern")
-        return "tool", f"grep: {pattern}" if pattern else "grep"
-    if tool == "find":
-        pattern = args.get("pattern")
-        return "tool", f"find: {pattern}" if pattern else "find"
-    if tool == "ls":
-        path = args.get("path")
-        if path:
-            return "tool", f"ls: `{relativize_path(str(path))}`"
-        return "tool", "ls"
-    return "tool", name
+    return tool_kind_and_title(name, args, path_keys=("path",))
 
 
 def _last_assistant_message(messages: Any) -> dict[str, Any] | None:
@@ -418,7 +394,7 @@ class PiRunner(ResumeTokenMixin, JsonlSubprocessRunner):
         cwd = get_run_base_dir() or Path.cwd()
         session_dir = _default_session_dir(cwd)
         session_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now(timezone.utc).isoformat()
+        timestamp = datetime.now(UTC).isoformat()
         safe_timestamp = timestamp.replace(":", "-").replace(".", "-")
         token = uuid4().hex
         filename = f"{safe_timestamp}_{token}.jsonl"
@@ -442,7 +418,9 @@ class PiRunner(ResumeTokenMixin, JsonlSubprocessRunner):
 def _default_session_dir(cwd: PurePath) -> Path:
     agent_dir = os.environ.get("PI_CODING_AGENT_DIR")
     base = Path(agent_dir).expanduser() if agent_dir else Path.home() / ".pi" / "agent"
-    safe_path = f"--{str(cwd).lstrip('/\\\\').replace('/', '-').replace('\\', '-').replace(':', '-')}--"
+    cwd_str = str(cwd).lstrip("/\\")
+    safe_path_part = cwd_str.translate(str.maketrans({"/": "-", "\\": "-", ":": "-"}))
+    safe_path = f"--{safe_path_part}--"
     return base / "sessions" / safe_path
 
 
