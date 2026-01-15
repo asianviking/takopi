@@ -127,7 +127,7 @@ class TelegramBridgeConfig:
     files: TelegramFilesSettings = field(default_factory=TelegramFilesSettings)
     chat_ids: tuple[int, ...] | None = None
     topics: TelegramTopicsSettings = field(default_factory=TelegramTopicsSettings)
-    message_batch_window_ms: float = 200.0
+    message_batch_window_ms: float = 1000.0
 
 
 class TelegramTransport:

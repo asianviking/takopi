@@ -90,7 +90,7 @@ Telegram messages but should be processed together.
 Configuration (under `[transports.telegram]`):
 
 ```toml
-message_batch_window_ms = 200.0  # default: 200ms
+message_batch_window_ms = 1000.0  # default: 1s
 ```
 
 Behavior:

@@ -100,7 +100,7 @@ class TelegramTransportSettings(BaseModel):
     voice_transcription_model: NonEmptyStr = "gpt-4o-mini-transcribe"
     session_mode: Literal["stateless", "chat"] = "stateless"
     show_resume_line: bool = True
-    message_batch_window_ms: float = 200.0
+    message_batch_window_ms: float = 1000.0
     topics: TelegramTopicsSettings = Field(default_factory=TelegramTopicsSettings)
     files: TelegramFilesSettings = Field(default_factory=TelegramFilesSettings)
 
@@ -108,7 +108,7 @@ class TelegramTransportSettings(BaseModel):
     @classmethod
     def _validate_message_batch_window_ms(cls, value: Any) -> Any:
         if value is None:
-            return 200.0
+            return 1000.0
         if isinstance(value, bool):
             raise ValueError("message_batch_window_ms must be a number")
         if not isinstance(value, (int, float)):
