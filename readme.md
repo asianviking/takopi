@@ -57,7 +57,7 @@ register a project with `takopi init happy-gadgets`, then target it from anywher
 
 mention a branch to run an agent in a dedicated worktree `/happy-gadgets @feat/memory-box freeze artifacts forever`.
 
-see [`docs/index.md`](docs/index.md) (or [`docs/user-guide.md`](docs/user-guide.md)) for configuration, worktrees, topics, file transfer, and more.
+see [takopi.dev](https://takopi.dev/) for configuration, worktrees, topics, file transfer, and more.
 
 ## plugins
 

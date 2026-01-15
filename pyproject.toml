@@ -32,6 +32,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/banteg/takopi"
+Documentation = "https://takopi.dev/"
 Repository = "https://github.com/banteg/takopi"
 Issues = "https://github.com/banteg/takopi/issues"
 

@@ -772,7 +772,7 @@ def create_app() -> typer.Typer:
     app = typer.Typer(
         add_completion=False,
         invoke_without_command=True,
-        help="Run takopi with auto-router (subcommands override the default engine).",
+        help="Telegram bridge for coding agents. Docs: https://takopi.dev/",
     )
     app.command(name="init")(init)
     app.command(name="chat-id")(chat_id)
