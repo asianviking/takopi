@@ -20,6 +20,8 @@ This document captures current behavior so transport changes stay intentional.
 
 `parse_incoming_update` accepts text messages and voice notes.
 
+### Voice transcription
+
 If voice transcription is enabled, takopi downloads the voice payload from Telegram,
 transcribes it with OpenAI, and routes the transcript through the same command and
 directive pipeline as typed text.
@@ -39,6 +41,36 @@ To use a local OpenAI-compatible Whisper server, also set `OPENAI_BASE_URL` (for
 example, `http://localhost:8000/v1`) and a dummy `OPENAI_API_KEY` if your server
 ignores it. If your server requires a specific model name, set
 `voice_transcription_model` (for example, `whisper-1`).
+
+### Trigger mode (mentions-only)
+
+Telegram’s bot privacy mode stops bots from seeing every message by default, but
+**admins always receive all messages** in groups. If you promote takopi to admin,
+Telegram will deliver every update even when privacy mode is enabled.
+
+To restore “only respond when invoked” behavior, use trigger mode:
+
+- `all` (default): any message can start a run (subject to ignore rules).
+- `mentions`: only start when explicitly invoked.
+
+Explicit invocation includes any of:
+
+- `@botname` mention in the message.
+- `/engine` or `/project_alias` as the first token.
+- Replying to a bot message.
+- Built-in or plugin slash commands (for example `/agent`, `/file`, `/trigger`).
+
+Commands:
+
+- `/trigger` shows the current mode and defaults.
+- `/trigger mentions` restricts runs to explicit invocations.
+- `/trigger all` restores the default behavior.
+- `/trigger clear` clears a topic override (topics only).
+
+In group chats, changing trigger mode requires the sender to be an admin.
+
+State is stored in `telegram_chat_prefs_state.json` (chat default) and
+`telegram_topics_state.json` (topic overrides) alongside the config file.
 
 ## Chat sessions (optional)
 
