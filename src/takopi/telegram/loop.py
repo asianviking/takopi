@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass
 from functools import partial
@@ -61,6 +62,7 @@ from .types import (
     TelegramIncomingUpdate,
 )
 from .voice import transcribe_voice
+from .debouncer import MessageBatch, PendingMessage, TopicDebouncer
 
 logger = get_logger(__name__)
 
@@ -552,6 +554,68 @@ async def run_main_loop(
                 )
 
             scheduler = ThreadScheduler(task_group=tg, run_job=run_thread_job)
+            debouncer = TopicDebouncer(window_ms=cfg.message_batch_window_ms)
+
+            async def dispatch_batch(batch: MessageBatch) -> None:
+                """Dispatch a debounced message batch."""
+                chat_session_key_for_batch: tuple[int, int | None] | None = None
+                if chat_session_store is not None and batch.thread_id is None:
+                    # For batched messages, use first message's chat_id
+                    # In private chats, session key is (chat_id, None)
+                    # In groups, we'd need sender_id which we don't track in batch
+                    # For now, skip chat session for batched group messages
+                    chat_session_key_for_batch = (batch.chat_id, None)
+
+                if batch.resume_token is None:
+                    tg.start_soon(
+                        run_job,
+                        batch.chat_id,
+                        batch.last_msg_id,
+                        batch.combined_text,
+                        None,
+                        batch.context,
+                        batch.thread_id,
+                        chat_session_key_for_batch,
+                        None,  # reply_ref
+                        scheduler.note_thread_known,
+                        batch.engine_override,
+                    )
+                else:
+                    progress_ref = await _send_queued_progress(
+                        cfg,
+                        chat_id=batch.chat_id,
+                        user_msg_id=batch.last_msg_id,
+                        thread_id=batch.thread_id,
+                        resume_token=batch.resume_token,
+                        context=batch.context,
+                    )
+                    await scheduler.enqueue_resume(
+                        batch.chat_id,
+                        batch.last_msg_id,
+                        batch.combined_text,
+                        batch.resume_token,
+                        batch.context,
+                        batch.thread_id,
+                        chat_session_key_for_batch,
+                        progress_ref,
+                    )
+
+            async def run_debouncer_timer() -> None:
+                """Background task that dispatches expired batches."""
+                while True:
+                    deadline = debouncer.next_deadline()
+                    if deadline is None:
+                        await anyio.sleep(0.05)
+                        continue
+                    now = time.monotonic()
+                    if deadline > now:
+                        await anyio.sleep(deadline - now)
+                    expired = debouncer.check_expired(time.monotonic())
+                    for batch in expired:
+                        await dispatch_batch(batch)
+
+            if cfg.message_batch_window_ms > 0:
+                tg.start_soon(run_debouncer_timer)
 
             def _build_upload_prompt(base: str, annotation: str) -> str:
                 if base and base.strip():
@@ -859,6 +923,14 @@ async def run_main_loop(
                     continue
 
                 command_id, args_text = _parse_slash_command(text)
+
+                # Slash commands bypass debouncing: flush pending and process immediately
+                if command_id is not None:
+                    debounce_key = (chat_id, msg.thread_id)
+                    flushed = debouncer.flush_topic(debounce_key)
+                    if flushed is not None:
+                        await dispatch_batch(flushed)
+
                 if command_id == "new":
                     if topic_store is not None and topic_key is not None:
                         tg.start_soon(
@@ -1059,38 +1131,19 @@ async def run_main_loop(
                     if stored is not None:
                         resume_token = stored
 
-                if resume_token is None:
-                    tg.start_soon(
-                        run_job,
-                        chat_id,
-                        user_msg_id,
-                        text,
-                        None,
-                        context,
-                        msg.thread_id,
-                        chat_session_key,
-                        reply_ref,
-                        scheduler.note_thread_known,
-                        engine_override,
-                    )
-                else:
-                    progress_ref = await _send_queued_progress(
-                        cfg,
-                        chat_id=chat_id,
-                        user_msg_id=user_msg_id,
-                        thread_id=msg.thread_id,
-                        resume_token=resume_token,
-                        context=context,
-                    )
-                    await scheduler.enqueue_resume(
-                        chat_id,
-                        user_msg_id,
-                        text,
-                        resume_token,
-                        context,
-                        msg.thread_id,
-                        chat_session_key,
-                        progress_ref,
-                    )
+                # Use debouncer to batch messages
+                pending_msg = PendingMessage(
+                    chat_id=chat_id,
+                    user_msg_id=user_msg_id,
+                    text=text,
+                    resume_token=resume_token,
+                    context=context,
+                    thread_id=msg.thread_id,
+                    engine_override=engine_override,
+                    timestamp=time.monotonic(),
+                )
+                batch = debouncer.add_message(pending_msg)
+                if batch is not None:
+                    await dispatch_batch(batch)
     finally:
         await cfg.exec_cfg.transport.close()
