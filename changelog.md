@@ -1,5 +1,19 @@
 # changelog
 
+## v0.19.0 (2026-01-15)
+
+### changes
+
+- overhaul onboarding with persona-based setup flows [#132](https://github.com/banteg/takopi/pull/132)
+- add queued cancel placeholder for Telegram runs [#136](https://github.com/banteg/takopi/pull/136)
+- prefix Telegram voice transcriptions for agent awareness [#135](https://github.com/banteg/takopi/pull/135)
+
+### docs
+
+- refresh onboarding docs with new widgets and hero flow [#138](https://github.com/banteg/takopi/pull/138)
+- fix docs site mobile layout and font consistency [#139](https://github.com/banteg/takopi/pull/139)
+- link to takopi.dev docs site
+
 ## v0.18.0 (2026-01-13)
 
 ### changes

@@ -30,7 +30,7 @@ Verify it's installed:
 takopi --version
 ```
 
-You should see something like `0.18.0`.
+You should see something like `0.19.0`.
 
 ## 3. Install agent CLIs
 
