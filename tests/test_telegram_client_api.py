@@ -160,11 +160,15 @@ async def test_client_methods_build_params_and_decode() -> None:
     assert send_call[1]["message_thread_id"] == 3
     assert send_call[1]["entities"]
     assert send_call[1]["parse_mode"] == "Markdown"
+    assert send_call[1]["link_preview_options"] == {"is_disabled": True}
     assert send_call[1]["reply_markup"]
 
     doc_call = next(call for call in client.calls if call[0] == "sendDocument")
     assert doc_call[2]["caption"] == "doc"
     assert doc_call[3]["document"][0] == "file.txt"
+
+    edit_call = next(call for call in client.calls if call[0] == "editMessageText")
+    assert edit_call[1]["link_preview_options"] == {"is_disabled": True}
 
 
 @pytest.mark.anyio

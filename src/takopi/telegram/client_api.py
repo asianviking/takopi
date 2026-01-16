@@ -392,6 +392,7 @@ class HttpBotClient:
             params["entities"] = entities
         if parse_mode is not None:
             params["parse_mode"] = parse_mode
+        params["link_preview_options"] = {"is_disabled": True}
         if reply_markup is not None:
             params["reply_markup"] = reply_markup
         result = await self._post("sendMessage", params)
@@ -443,6 +444,7 @@ class HttpBotClient:
             params["entities"] = entities
         if parse_mode is not None:
             params["parse_mode"] = parse_mode
+        params["link_preview_options"] = {"is_disabled": True}
         if reply_markup is not None:
             params["reply_markup"] = reply_markup
         result = await self._post("editMessageText", params)
