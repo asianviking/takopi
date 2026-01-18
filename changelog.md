@@ -1,5 +1,17 @@
 # changelog
 
+## v0.21.1 (2026-01-18)
+
+### fixes
+
+- separate telegram voice transcription client [#166](https://github.com/banteg/takopi/pull/166)
+- disable telegram link previews by default [#160](https://github.com/banteg/takopi/pull/160)
+
+### docs
+
+- align engine terminology in telegram and docs [#162](https://github.com/banteg/takopi/pull/162)
+- add takopi-discord plugin to plugins reference [#164](https://github.com/banteg/takopi/pull/164)
+
 ## v0.21.0 (2026-01-16)
 
 ### changes
