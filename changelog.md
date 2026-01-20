@@ -1,5 +1,15 @@
 # changelog
 
+## v0.21.2 (2026-01-20)
+
+### fixes
+
+- clear chat sessions on cwd change [#172](https://github.com/banteg/takopi/pull/172)
+
+### docs
+
+- add takopi-slack plugin to reference [#168](https://github.com/banteg/takopi/pull/168)
+
 ## v0.21.1 (2026-01-18)
 
 ### fixes
